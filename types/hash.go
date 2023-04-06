@@ -1,6 +1,8 @@
 package types
 
 import (
+	"bytes"
+	"encoding/gob"
 	"encoding/hex"
 	"fmt"
 	"math/rand"
@@ -23,6 +25,13 @@ func (h *Hash) ToSlice() []byte {
 		b[i] = h[i]
 	}
 	return b
+}
+
+func (h *Hash) Bytes() []byte {
+	buf := &bytes.Buffer{}
+	enc := gob.NewEncoder(buf)
+	enc.Encode(h)
+	return buf.Bytes()
 }
 
 func (h *Hash) String() string {

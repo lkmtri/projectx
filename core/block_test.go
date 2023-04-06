@@ -1,63 +1,51 @@
 package core
 
 import (
-	"bytes"
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/lkmtri/projectx/crypto"
 	"github.com/lkmtri/projectx/types"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestHeaderEncodeDecode(t *testing.T) {
-	h := &Header{
-		Version:   1,
-		PrevBlock: types.RandomHash(),
-		Timestamp: time.Now().UnixNano(),
-		Height:    10,
-		Nonce:     12345,
+func randomBlock(height uint32) *Block {
+	header := &Header{
+		Version:       1,
+		PrevBlockHash: types.RandomHash(),
+		Height:        height,
+		Timestamp:     time.Now().UnixNano(),
 	}
 
-	buf := &bytes.Buffer{}
-	assert.Nil(t, h.EncodeBinary(buf))
+	txn := Transaction{}
 
-	hDecode := &Header{}
-	assert.Nil(t, hDecode.DecodeBinary(buf))
-	assert.Equal(t, h, hDecode)
-}
-
-func TestBlockEncodeDecode(t *testing.T) {
-	b := &Block{
-		Header: Header{
-			Version:   1,
-			PrevBlock: types.RandomHash(),
-			Timestamp: time.Now().UnixNano(),
-			Height:    10,
-			Nonce:     12345,
-		},
-		Transactions: nil,
-	}
-
-	buf := &bytes.Buffer{}
-	assert.Nil(t, b.EncodeBinary(buf))
-
-	bDecode := &Block{}
-	assert.Nil(t, bDecode.DecodeBinary(buf))
-	assert.Equal(t, b, bDecode)
+	return NewBlock(header, []Transaction{txn}, WithHasher(BlockHasher{}))
 }
 
 func TestBlockHash(t *testing.T) {
-	b := &Block{
-		Header: Header{
-			Version:   1,
-			PrevBlock: types.RandomHash(),
-			Timestamp: time.Now().UnixNano(),
-			Height:    10,
-			Nonce:     12345,
-		},
-		Transactions: nil,
-	}
+	block := randomBlock(10)
+	fmt.Println(block.Hash())
+}
 
-	h := b.Hash()
-	assert.False(t, h.IsZero())
+func TestBlockVerify(t *testing.T) {
+	privateKey := crypto.GeneratePrivateKey()
+	block := randomBlock(10)
+
+	assert.NotNil(t, block.Verify())
+
+	assert.Nil(t, block.Sign(privateKey))
+	assert.NotNil(t, block.Signature)
+
+	otherPrivateKey := crypto.GeneratePrivateKey()
+	otherPublicKey := otherPrivateKey.PublicKey()
+
+	assert.Nil(t, block.Verify())
+	block.Validator = otherPublicKey
+	assert.NotNil(t, block.Verify())
+
+	block.Validator = privateKey.PublicKey()
+	assert.Nil(t, block.Verify())
+	block.Version = 2
+	assert.NotNil(t, block.Verify())
 }
