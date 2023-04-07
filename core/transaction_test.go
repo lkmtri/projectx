@@ -34,11 +34,11 @@ func TestTransactionVerify(t *testing.T) {
 	otherPublicKey := otherPrivateKey.PublicKey()
 
 	// tamper with public key
-	txn.Validator = otherPublicKey
+	txn.From = otherPublicKey
 	assert.NotNil(t, txn.Verify())
 
 	// tamper with data
-	txn.Validator = privateKey.PublicKey()
+	txn.From = privateKey.PublicKey()
 	assert.Nil(t, txn.Verify())
 	txn.Data = []byte("Tampered data")
 	assert.NotNil(t, txn.Verify())

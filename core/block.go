@@ -18,6 +18,13 @@ type Header struct {
 	Height        uint32
 }
 
+func (h *Header) Bytes() []byte {
+	buf := &bytes.Buffer{}
+	enc := gob.NewEncoder(buf)
+	_ = enc.Encode(h)
+	return buf.Bytes()
+}
+
 type Block struct {
 	*Header
 	Transactions []Transaction
@@ -26,12 +33,17 @@ type Block struct {
 
 	// to cache the hash of Header
 	hash   types.Hash
-	hasher Hasher[*Block]
+	hasher Hasher[*Header]
 }
 
 type BlockOpts = func(*Block)
 
-func WithHasher(hasher Hasher[*Block]) BlockOpts {
+var (
+	errBlockNoSignature = fmt.Errorf("block has no signature")
+	errInvalidSignature = fmt.Errorf("block has invalid signature")
+)
+
+func WithHasher(hasher Hasher[*Header]) BlockOpts {
 	return func(b *Block) {
 		b.hasher = hasher
 	}
@@ -50,8 +62,16 @@ func NewBlock(h *Header, txx []Transaction, opts ...BlockOpts) *Block {
 	return block
 }
 
+func (b *Block) AddTransaction(txn Transaction) {
+	b.Transactions = append(b.Transactions, txn)
+}
+
 func (b *Block) Sign(privateKey crypto.PrivateKey) error {
-	sig, err := privateKey.Sign(b.hashBytes())
+	if b.Signature != nil {
+		return nil
+	}
+
+	sig, err := privateKey.Sign(b.Bytes())
 	if err != nil {
 		return err
 	}
@@ -63,11 +83,11 @@ func (b *Block) Sign(privateKey crypto.PrivateKey) error {
 
 func (b *Block) Verify() error {
 	if b.Signature == nil {
-		return fmt.Errorf("block has no signature")
+		return errBlockNoSignature
 	}
 
-	if !b.Signature.Verify(b.Validator, b.hashBytes()) {
-		return fmt.Errorf("block has invalid signature")
+	if !b.Signature.Verify(b.Validator, b.Bytes()) {
+		return errInvalidSignature
 	}
 
 	return nil
@@ -83,20 +103,13 @@ func (b *Block) Decode(r io.Reader, decoder Decoder[*Block]) error {
 
 func (b *Block) Hash() types.Hash {
 	if b.hash.IsZero() {
-		b.hash = b.hasher.Hash(b)
+		b.hash = b.hasher.Hash(b.Header)
 	}
 
 	return b.hash
 }
 
-func (b *Block) hashBytes() []byte {
-	hash := b.hasher.Hash(b)
+func (b *Block) Bytes() []byte {
+	hash := b.hasher.Hash(b.Header)
 	return hash.Bytes()
-}
-
-func (b *Block) HeaderData() []byte {
-	buf := &bytes.Buffer{}
-	enc := gob.NewEncoder(buf)
-	_ = enc.Encode(*b.Header)
-	return buf.Bytes()
 }

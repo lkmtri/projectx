@@ -32,6 +32,13 @@ func (bc *BlockChain) HasBlock(height uint32) bool {
 	return height <= bc.Height()
 }
 
+func (bc *BlockChain) GetTailHeader() *Header {
+	if len(bc.headers) == 0 {
+		return nil
+	}
+	return bc.headers[bc.Height()]
+}
+
 func (bc *BlockChain) Height() uint32 {
 	return uint32(len(bc.headers) - 1)
 }
